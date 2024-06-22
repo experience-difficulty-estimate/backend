@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import engine
-from app import models, crud, schemas
-from app.utils import get_embedding, get_difficulty_scores
+from database import engine
+import models, crud, schemas
+from utils import get_embedding, get_difficulty_scores
 
 app = FastAPI()
 
-# CORS 설정 추가
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React 앱의 주소
+    allow_origins=["*"],  # 실제 배포 시 구체적인 origin으로 변경해야 합니다
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,9 +19,7 @@ models.Base.metadata.create_all(bind=engine)
 
 
 @app.post("/api/estimate", response_model=schemas.ExperienceResponse)
-async def estimate_difficulty(
-    experience: schemas.ExperienceCreate,
-) -> schemas.ExperienceResponse:
+async def estimate_difficulty(experience: schemas.ExperienceCreate):
     embedding = get_embedding(experience.text)
     similar_exp, similarity = crud.get_similar_experience(embedding)
 
@@ -45,3 +43,9 @@ async def estimate_difficulty(
         level=level,
         similarity=similarity if similar_exp else 0,
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
