@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
@@ -16,6 +17,11 @@ app.add_middleware(
 )
 
 models.Base.metadata.create_all(bind=engine)
+
+
+@app.get("/")
+def get_root():
+    return {"message": "Hello World"}
 
 
 @app.post("/api/estimate", response_model=schemas.ExperienceResponse)
@@ -45,3 +51,7 @@ async def estimate_difficulty(
         level=level,
         similarity=similarity if similar_exp else 0,
     )
+
+
+if __name__ == "__main__":
+    uvicorn.run("__main__:app", host="0.0.0.0", port=8000, reload=True)
