@@ -11,7 +11,8 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://difficulty-estimation-frontend.vercel.app/"
+        "http://localhost:5173",
+        "https://difficulty-estimation-frontend.vercel.app/",
     ],  # React 앱의 주소
     allow_credentials=True,
     allow_methods=["*"],
