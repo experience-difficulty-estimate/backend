@@ -11,7 +11,7 @@ import os
 from dotenv import load_dotenv
 
 # 이 부분은 models.py에서 정의한 모델들을 import하는 곳입니다.
-from app.models import Base
+from models import Base
 
 # .env 파일 로드
 load_dotenv()

@@ -6,10 +6,10 @@ from utils import get_embedding, get_difficulty_scores
 
 app = FastAPI()
 
-# CORS 설정
+# CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 실제 배포 시 구체적인 origin으로 변경해야 합니다
+    allow_origins=["http://localhost:5173"],  # React 앱의 주소
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,7 +19,9 @@ models.Base.metadata.create_all(bind=engine)
 
 
 @app.post("/api/estimate", response_model=schemas.ExperienceResponse)
-async def estimate_difficulty(experience: schemas.ExperienceCreate):
+async def estimate_difficulty(
+    experience: schemas.ExperienceCreate,
+) -> schemas.ExperienceResponse:
     embedding = get_embedding(experience.text)
     similar_exp, similarity = crud.get_similar_experience(embedding)
 
