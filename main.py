@@ -10,7 +10,9 @@ app = FastAPI()
 # CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React 앱의 주소
+    allow_origins=[
+        "https://difficulty-estimation-frontend.vercel.app/"
+    ],  # React 앱의 주소
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
