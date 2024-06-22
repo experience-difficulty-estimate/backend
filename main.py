@@ -53,5 +53,7 @@ async def estimate_difficulty(
     )
 
 
-if __name__ == "__main__":
-    uvicorn.run("__main__:app", host="0.0.0.0", port=8000, reload=True)
+# 아래 코드는 로컬 실행을 위한 것입니다.
+# Render에서는 별도의 start command를 사용하기 때문에 필요하지 않습니다.
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
