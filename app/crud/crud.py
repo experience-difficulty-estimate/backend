@@ -6,7 +6,7 @@ from database import get_db
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from scipy import stats
-from typing import List
+from typing import List, Optional
 
 
 def calculate_relative_difficulty(db: Session, difficulty_score: float) -> float:
@@ -22,6 +22,31 @@ def calculate_relative_difficulty(db: Session, difficulty_score: float) -> float
 
 
 def update_all_relative_difficulties(db: Session):
+    experiences = (
+        db.query(models.Experience).order_by(models.Experience.difficulty_score).all()
+    )
+    total = len(experiences)
+    for i, exp in enumerate(experiences):
+        exp.relative_difficulty = ((i + 1) / total) * 100
+    db.commit()
+
+
+def update_experience_score(
+    experience_id: int, new_score: float, db: Session
+) -> models.Experience:
+    experience = (
+        db.query(models.Experience)
+        .filter(models.Experience.id == experience_id)
+        .first()
+    )
+    if experience:
+        experience.difficulty_score = new_score
+        db.commit()
+        db.refresh(experience)
+    return experience
+
+
+def recalculate_relative_difficulties(db: Session):
     experiences = (
         db.query(models.Experience).order_by(models.Experience.difficulty_score).all()
     )
@@ -167,5 +192,20 @@ def get_experience_by_id(
     )
 
 
+def find_similar_experience(
+    embedding: List[float], db: Session, threshold: float = 0.9
+) -> Optional[models.Experience]:
+    experiences = db.query(models.Experience).all()
+    for exp in experiences:
+        similarity = cosine_similarity([embedding], [exp.embedding])[0][0]
+        if similarity > threshold:
+            return exp
+    return None
+
+
 def get_total_experiences_count(db: Session = next(get_db())) -> int:
     return db.query(func.count(models.Experience.id)).scalar()
+
+
+def get_experience_by_text(text: str, db: Session) -> Optional[models.Experience]:
+    return db.query(models.Experience).filter(models.Experience.text == text).first()
