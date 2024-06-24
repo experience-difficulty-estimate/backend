@@ -74,3 +74,28 @@ def analyze_experience(experience: str) -> dict:
     detailed_scores = get_difficulty_scores(experience)
 
     return {"single_score": single_score, "detailed_scores": detailed_scores}
+
+
+def compare_experience_difficulties(
+    new_experience: str, existing_experience: str, existing_score: float
+) -> float:
+    PROMPT = f"""Compare the difficulty of two experiences. The first experience has a known difficulty score of {existing_score} out of 100.
+
+    Experience 1 (Score: {existing_score}): {existing_experience}
+    Experience 2 (Unknown Score): {new_experience}
+
+    Estimate the difficulty score for Experience 2 relative to Experience 1. Your response should be a single number between 0 and 100, with up to two decimal places. Do not include any additional text or explanation."""
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
+        max_tokens=10,
+        messages=[
+            {"role": "system", "content": PROMPT},
+            {
+                "role": "user",
+                "content": "What is the estimated difficulty score for Experience 2?",
+            },
+        ],
+        temperature=0.7,
+    )
+    return float(response.choices[0].message.content.strip())
