@@ -5,63 +5,90 @@ from app.schemas import schemas
 from app.crud import crud
 from app.utils.gpt import analyze_experience, get_embedding
 from app.database import get_db
+from sklearn.metrics.pairwise import cosine_similarity
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def find_similar_experience(
+    new_embedding: list[float], db: Session, similarity_threshold: float = 0.95
+):
+    experiences = db.query(crud.models.Experience).all()
+    for exp in experiences:
+        similarity = cosine_similarity([new_embedding], [exp.embedding])[0][0]
+        if similarity > similarity_threshold:
+            return exp
+    return None
+
+
 @router.post("/estimate", response_model=schemas.ExperienceResponse)
 async def estimate_difficulty(
     experience: schemas.ExperienceCreate, db: Session = Depends(get_db)
-):
-    analysis = analyze_experience(experience.text)
-    embedding = get_embedding(experience.text)
+) -> schemas.ExperienceResponse:
+    try:
+        embedding = get_embedding(experience.text)
+        similar_exp = find_similar_experience(embedding, db)
 
-    new_experience = crud.create_experience(
-        text=experience.text,
-        embedding=embedding,
-        difficulty_score=analysis["single_score"],
-        difficulty_scores=analysis["detailed_scores"],
-        db=db,
-    )
+        if similar_exp:
+            difficulty_score = similar_exp.difficulty_score
+            logger.info(
+                f"Found similar experience: {similar_exp.text}. Using its difficulty score: {difficulty_score}"
+            )
+        else:
+            analysis = analyze_experience(experience.text)
+            difficulty_score = analysis["single_score"]
+            logger.info(
+                f"No similar experience found. Using GPT analysis. Difficulty score: {difficulty_score}"
+            )
 
-    crud.calculate_percentiles(db)
-    lower_exp, higher_exp = crud.get_adjacent_experiences(
-        new_experience.difficulty_score, db
-    )
-    total_count = crud.get_total_experiences_count(db)
+        new_experience = crud.create_experience(
+            text=experience.text,
+            embedding=embedding,
+            difficulty_score=difficulty_score,
+            db=db,
+        )
 
-    return schemas.ExperienceResponse(
-        user_experience=schemas.ExperienceWithScore(
-            id=new_experience.id,
-            text=new_experience.text,
-            difficulty_score=new_experience.difficulty_score,
-            percentile=new_experience.percentile,
-        ),
-        adjacent_experiences=schemas.AdjacentExperiences(
-            lower=(
-                schemas.ExperienceWithScore(
-                    id=lower_exp.id,
-                    text=lower_exp.text,
-                    difficulty_score=lower_exp.difficulty_score,
-                    percentile=lower_exp.percentile,
-                )
-                if lower_exp
-                else None
+        crud.calculate_percentiles(db)
+        lower_exp, higher_exp = crud.get_adjacent_experiences(
+            new_experience.difficulty_score, db
+        )
+        total_count = crud.get_total_experiences_count(db)
+
+        return schemas.ExperienceResponse(
+            user_experience=schemas.ExperienceWithScore(
+                id=new_experience.id,
+                text=new_experience.text,
+                difficulty_score=new_experience.difficulty_score,
+                percentile=new_experience.percentile,
             ),
-            higher=(
-                schemas.ExperienceWithScore(
-                    id=higher_exp.id,
-                    text=higher_exp.text,
-                    difficulty_score=higher_exp.difficulty_score,
-                    percentile=higher_exp.percentile,
-                )
-                if higher_exp
-                else None
+            adjacent_experiences=schemas.AdjacentExperiences(
+                lower=(
+                    schemas.ExperienceWithScore(
+                        id=lower_exp.id,
+                        text=lower_exp.text,
+                        difficulty_score=lower_exp.difficulty_score,
+                        percentile=lower_exp.percentile,
+                    )
+                    if lower_exp
+                    else None
+                ),
+                higher=(
+                    schemas.ExperienceWithScore(
+                        id=higher_exp.id,
+                        text=higher_exp.text,
+                        difficulty_score=higher_exp.difficulty_score,
+                        percentile=higher_exp.percentile,
+                    )
+                    if higher_exp
+                    else None
+                ),
             ),
-        ),
-        total_experiences=total_count,
-    )
+            total_experiences=total_count,
+        )
+    except Exception as e:
+        logger.error(f"Error in estimate_difficulty: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/compare", response_model=schemas.FinalExperienceResponse)
