@@ -12,7 +12,7 @@ load_dotenv(f".env.{app_env}")
 class Settings(BaseSettings):
     database_url: str
     app_env: str = app_env
-    debug: bool
+    DEBUG: bool = False
     openai_api_key: str
 
     class Config:
