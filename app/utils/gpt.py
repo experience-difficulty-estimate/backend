@@ -43,3 +43,34 @@ def get_difficulty_scores(experience: str) -> list[float]:
         temperature=0.7,
     )
     return json.loads(response.choices[0].message.content)
+
+
+def get_single_difficulty_score(experience: str) -> float:
+    PROMPT = """You are an AI assistant specialized in estimating the overall difficulty of various life experiences. You will receive a description of an experience and should respond with a single difficulty score.
+
+    Provide a score from 0 to 100, where 0 is extremely easy/common and 100 is extremely difficult/rare.
+
+    Consider factors like physical difficulty, mental effort, time investment, technical complexity, social challenge, financial burden, risk level, persistence required, creativity needed, and rarity.
+
+    Your response should be a single number between 0 and 100, with up to two decimal places. Do not include any additional text or explanation."""
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo-0125",
+        max_tokens=10,
+        messages=[
+            {"role": "system", "content": PROMPT},
+            {
+                "role": "user",
+                "content": f"Estimate the overall difficulty of: {experience}",
+            },
+        ],
+        temperature=0.7,
+    )
+    return float(response.choices[0].message.content.strip())
+
+
+def analyze_experience(experience: str) -> dict:
+    single_score = get_single_difficulty_score(experience)
+    detailed_scores = get_difficulty_scores(experience)
+
+    return {"single_score": single_score, "detailed_scores": detailed_scores}

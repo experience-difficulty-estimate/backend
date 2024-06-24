@@ -1,36 +1,40 @@
 import sys
 import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 from alembic import context
-import os
 from dotenv import load_dotenv
 
+# 현재 파일의 디렉토리 경로
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 프로젝트 루트 디렉토리 경로
+project_root = os.path.abspath(os.path.join(current_dir, os.pardir))
+
+# 프로젝트 루트 디렉토리를 sys.path에 추가
+sys.path.append(project_root)
+
 # 이 부분은 models.py에서 정의한 모델들을 import하는 곳입니다.
-from models import Base
+from app.models.models import Base
 
 # .env 파일 로드
-load_dotenv()
+app_env = os.getenv("APP_ENV", "local")
+load_dotenv(f".env.{app_env}")
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# Alembic Config 객체 가져오기
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# 파일 구성 설정
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
+# SQLAlchemy MetaData 객체 설정
 target_metadata = Base.metadata
 
 # 환경 변수에서 데이터베이스 URL 설정
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
+# 여기에 로컬 데이터베이스 URL을 직접 입력합니다.
+local_database_url = "postgresql://ijaejun:1234@localhost/experiences"
+config.set_main_option("sqlalchemy.url", local_database_url)
 
 
 def run_migrations_offline() -> None:
