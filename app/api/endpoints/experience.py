@@ -102,7 +102,8 @@ async def compare_experiences(
             db=db,
         )
 
-        # 사용자 비교 결과에 따라 난이도 점수 조정
+        # 사용자 비교 결과에 따라 상대적 난이도 조정
+        adjustment = 0
         if (
             comparison.is_more_difficult_than_lower
             and comparison.is_less_difficult_than_higher
@@ -110,33 +111,33 @@ async def compare_experiences(
             # 현재 난이도 유지
             pass
         elif comparison.is_more_difficult_than_lower:
-            # 난이도 약간 증가
-            experience.difficulty_score *= 1.05
+            # 상대적 난이도 약간 증가
+            adjustment = 2
         elif comparison.is_less_difficult_than_higher:
-            # 난이도 약간 감소
-            experience.difficulty_score *= 0.95
+            # 상대적 난이도 약간 감소
+            adjustment = -2
         else:
-            # 사용자가 양쪽 모두 거부한 경우, 더 큰 조정 필요
-            if experience.difficulty_score > 50:
-                experience.difficulty_score *= 0.9
-            else:
-                experience.difficulty_score *= 1.1
+            # 사용자가 양쪽 모두 거부한 경우, 더 큰 조정
+            adjustment = 5 if experience.relative_difficulty < 50 else -5
 
-        experience.difficulty_score = max(0, min(100, experience.difficulty_score))
-        logger.info(f"Adjusted difficulty score: {experience.difficulty_score}")
-
-        # 난이도 점수 업데이트 및 퍼센타일 재계산
-        updated_experience = crud.update_experience_score(
-            experience_id=experience.id, new_score=experience.difficulty_score, db=db
+        new_relative_difficulty = max(
+            0, min(100, experience.relative_difficulty + adjustment)
         )
-        crud.calculate_percentiles(db)
+        logger.info(f"Adjusted relative difficulty: {new_relative_difficulty}")
+
+        # 상대적 난이도 업데이트 및 전체 재계산
+        updated_experience = crud.update_experience_relative_difficulty(
+            experience_id=experience.id,
+            new_relative_difficulty=new_relative_difficulty,
+            db=db,
+        )
+        crud.recalculate_difficulties(db)
 
         return schemas.FinalExperienceResponse(
             id=updated_experience.id,
             text=updated_experience.text,
             difficulty_score=updated_experience.difficulty_score,
-            percentile=updated_experience.percentile,
-            final_percentile=updated_experience.percentile,
+            relative_difficulty=updated_experience.relative_difficulty,
         )
     except Exception as e:
         logger.error(f"Error in compare_experiences: {str(e)}")
