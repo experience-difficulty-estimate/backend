@@ -13,7 +13,7 @@ class ExperienceCreate(ExperienceBase):
 class ExperienceWithScore(ExperienceBase):
     id: int
     difficulty_score: float
-    percentile: float
+    relative_difficulty: float
 
 
 class AdjacentExperiences(BaseModel):
