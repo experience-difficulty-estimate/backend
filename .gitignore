@@ -48,6 +48,8 @@ Thumbs.db
 
 # 환경 변수 파일
 .env
+.env.local
+.env.production
 
 # Alembic 관련
 alembic/versions/*
