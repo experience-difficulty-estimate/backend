@@ -82,32 +82,17 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def calculate_percentiles(db: Session = next(get_db())):
+def recalculate_difficulties(db: Session):
     experiences = (
         db.query(models.Experience)
-        .filter(models.Experience.difficulty_score.isnot(None))
+        .order_by(models.Experience.relative_difficulty)
         .all()
     )
-
-    if not experiences:
-        return
-
-    all_scores = [exp.difficulty_score for exp in experiences]
-
-    for experience in experiences:
-        percentile = stats.percentileofscore(all_scores, experience.difficulty_score)
-
-        db.query(models.Experience).filter(
-            models.Experience.id == experience.id
-        ).update({"percentile": percentile})
-
+    total = len(experiences)
+    for i, exp in enumerate(experiences):
+        exp.relative_difficulty = ((i + 1) / total) * 100
+        exp.difficulty_score = exp.relative_difficulty  # 또는 다른 적절한 변환 로직
     db.commit()
-
-
-def calculate_percentile(scores, new_score):
-    all_scores = np.append(scores, new_score)
-    percentile = stats.percentileofscore(all_scores, new_score)
-    return percentile
 
 
 def get_adjacent_experiences(
@@ -157,8 +142,8 @@ def create_comparison(
     return db_comparison
 
 
-def update_experience_score(
-    experience_id: int, new_score: float, db: Session = next(get_db())
+def update_experience_relative_difficulty(
+    experience_id: int, new_relative_difficulty: float, db: Session
 ) -> models.Experience:
     experience = (
         db.query(models.Experience)
@@ -166,7 +151,7 @@ def update_experience_score(
         .first()
     )
     if experience:
-        experience.difficulty_score = new_score
+        experience.relative_difficulty = new_relative_difficulty
         db.commit()
         db.refresh(experience)
     return experience
