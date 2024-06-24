@@ -9,22 +9,50 @@ from scipy import stats
 from typing import List
 
 
+def calculate_relative_difficulty(db: Session, difficulty_score: float) -> float:
+    total_experiences = db.query(func.count(models.Experience.id)).scalar()
+    lower_experiences = (
+        db.query(func.count(models.Experience.id))
+        .filter(models.Experience.difficulty_score <= difficulty_score)
+        .scalar()
+    )
+    return (
+        (lower_experiences / total_experiences) * 100 if total_experiences > 0 else 50.0
+    )
+
+
+def update_all_relative_difficulties(db: Session):
+    experiences = (
+        db.query(models.Experience).order_by(models.Experience.difficulty_score).all()
+    )
+    total = len(experiences)
+    for i, exp in enumerate(experiences):
+        exp.relative_difficulty = ((i + 1) / total) * 100
+    db.commit()
+
+
 def create_experience(
     text: str,
-    embedding: List[float],
+    embedding: list[float],
     difficulty_score: float,
-    difficulty_scores: List[float],
+    difficulty_scores: list[float],
     db: Session,
-):
+) -> models.Experience:
+    relative_difficulty = calculate_relative_difficulty(db, difficulty_score)
     db_experience = models.Experience(
         text=text,
         embedding=embedding,
         difficulty_score=difficulty_score,
+        relative_difficulty=relative_difficulty,
         difficulty_scores=difficulty_scores,
     )
     db.add(db_experience)
     db.commit()
     db.refresh(db_experience)
+
+    # 모든 경험의 상대적 난이도 업데이트
+    update_all_relative_difficulties(db)
+
     return db_experience
 
 
@@ -54,36 +82,26 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def calculate_percentiles(db: Session):
-    experiences = db.query(models.Experience).all()
+def calculate_percentiles(db: Session = next(get_db())):
+    experiences = (
+        db.query(models.Experience)
+        .filter(models.Experience.difficulty_score.isnot(None))
+        .all()
+    )
 
     if not experiences:
         return
 
-    all_scores = [
-        exp.difficulty_score for exp in experiences if exp.difficulty_score is not None
-    ]
-
-    if not all_scores:
-        return
+    all_scores = [exp.difficulty_score for exp in experiences]
 
     for experience in experiences:
-        if experience.difficulty_score is None:
-            continue
-
-        percentile = np.percentile(
-            all_scores,
-            np.searchsorted(np.sort(all_scores), experience.difficulty_score)
-            / len(all_scores)
-            * 100,
-        )
+        percentile = stats.percentileofscore(all_scores, experience.difficulty_score)
 
         db.query(models.Experience).filter(
             models.Experience.id == experience.id
         ).update({"percentile": percentile})
 
     db.commit()
-    logger.info("Percentiles calculated and updated successfully.")
 
 
 def calculate_percentile(scores, new_score):
@@ -95,19 +113,31 @@ def calculate_percentile(scores, new_score):
 def get_adjacent_experiences(
     difficulty_score: float, db: Session = next(get_db())
 ) -> tuple[models.Experience | None, models.Experience | None]:
-    lower = (
-        db.query(models.Experience)
-        .filter(models.Experience.difficulty_score < difficulty_score)
-        .order_by(models.Experience.difficulty_score.desc())
-        .first()
+    logger.info(
+        f"Getting adjacent experiences for difficulty score: {difficulty_score}"
     )
-    higher = (
-        db.query(models.Experience)
-        .filter(models.Experience.difficulty_score > difficulty_score)
-        .order_by(models.Experience.difficulty_score)
-        .first()
-    )
-    return lower, higher
+    try:
+        lower = (
+            db.query(models.Experience)
+            .filter(models.Experience.difficulty_score.isnot(None))
+            .filter(models.Experience.difficulty_score < difficulty_score)
+            .order_by(models.Experience.difficulty_score.desc())
+            .first()
+        )
+        higher = (
+            db.query(models.Experience)
+            .filter(models.Experience.difficulty_score.isnot(None))
+            .filter(models.Experience.difficulty_score > difficulty_score)
+            .order_by(models.Experience.difficulty_score)
+            .first()
+        )
+        logger.info(
+            f"Adjacent experiences found. Lower: {'Found' if lower else 'None'}, Higher: {'Found' if higher else 'None'}"
+        )
+        return lower, higher
+    except Exception as e:
+        logger.error(f"Error in get_adjacent_experiences: {str(e)}", exc_info=True)
+        raise
 
 
 def create_comparison(

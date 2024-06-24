@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
@@ -19,7 +20,17 @@ from app.models.models import Base
 
 # .env 파일 로드
 app_env = os.getenv("APP_ENV", "local")
-load_dotenv(f".env.{app_env}")
+dotenv_path = os.path.join(project_root, f".env.{app_env}")
+load_dotenv(dotenv_path)
+
+# 로거 설정
+logger = logging.getLogger("alembic.env")
+
+# 환경 변수가 올바르게 로드되었는지 확인
+database_url = os.getenv("DATABASE_URL")
+logger.info(f"Loaded environment: {app_env}")
+logger.info(f"Loading .env file from: {dotenv_path}")
+logger.info(f"DATABASE_URL: {database_url}")
 
 # Alembic Config 객체 가져오기
 config = context.config
@@ -32,9 +43,10 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # 환경 변수에서 데이터베이스 URL 설정
-# 여기에 로컬 데이터베이스 URL을 직접 입력합니다.
-local_database_url = "postgresql://ijaejun:1234@localhost/experiences"
-config.set_main_option("sqlalchemy.url", local_database_url)
+if not database_url:
+    raise ValueError("DATABASE_URL environment variable not set")
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 
 def run_migrations_offline() -> None:
